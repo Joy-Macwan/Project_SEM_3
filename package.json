@@ -1,0 +1,20 @@
+{
+  "name": "repair-reuse-reduce",
+  "version": "1.0.0",
+  "description": "Repair, Reuse, Reduce - E-commerce Platform",
+  "private": true,
+  "scripts": {
+    "install-all": "npm install && cd client && npm install && cd ../server && npm install",
+    "dev:frontend": "cd client && npm run dev",
+    "dev:backend": "cd server && npm run dev",
+    "start:frontend": "cd client && npm start",
+    "start:backend": "cd server && npm start",
+    "build": "cd client && npm run build",
+    "db:check": "cd server && npm run db:check",
+    "db:init": "cd server && npm run db:init",
+    "db:reset": "cd server && npm run db:reset"
+  },
+  "workspaces": ["client", "server"],
+  "author": "Joy-Macwan",
+  "license": "MIT"
+}

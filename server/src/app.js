@@ -1,59 +1,89 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
-const session = require('express-session');
-const path = require('path');
+const dotenv = require('dotenv');
 const { generalLimiter } = require('./middleware/rateLimit.middleware');
+const path = require('path');
 
-// Import routes
-const adminRoutes = require('./routes/admin.routes');
-const buyerRoutes = require('./routes/buyer.routes');
-const sellerRoutes = require('./routes/seller.routes');
-const repairCenterRoutes = require('./routes/repairCenter.routes');
+// Load environment variables
+dotenv.config();
 
 // Initialize express app
 const app = express();
 
 // Environment variables
-const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
-const SESSION_SECRET = process.env.SESSION_SECRET || 'your-secret-key'; // Use a secure value in production
+
+// Trust proxy - required for express-rate-limit behind proxy
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet()); // Security headers
-app.use(cors()); // Enable CORS
-app.use(express.json()); // Parse JSON bodies
-app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
-app.use(morgan('dev')); // HTTP request logger
+
+// CORS configuration for Codespace and local development
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allow localhost and codespace URLs
+    if (origin.includes('localhost') || origin.includes('github.dev') || origin.includes('app.github.dev')) {
+      return callback(null, true);
+    }
+    
+    // Fallback to environment variable
+    if (origin === (process.env.CLIENT_URL || 'http://localhost:5173')) {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+};
+
+app.use(cors(corsOptions)); // Enable CORS with credentials
 
 // Apply global rate limiting
 app.use(generalLimiter);
 
-// Session management
-app.use(session({
-  secret: SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: NODE_ENV === 'production', // Use secure cookies in production
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
-}));
+// Body parser middleware
+app.use(express.json()); // Parse JSON bodies
+app.use(express.urlencoded({ extended: false })); // Parse URL-encoded bodies
+app.use(cookieParser());
 
-// API routes
-app.use('/api/admin', adminRoutes);
-app.use('/api/buyer', buyerRoutes);
-app.use('/api/seller', sellerRoutes);
-app.use('/api/repair-center', repairCenterRoutes);
+// HTTP request logger
+app.use(morgan('dev'));
+
+// Admin API routes
+app.use('/api/admin/auth', require('./routes/admin/auth.routes'));
+app.use('/api/admin/users', require('./routes/admin/users.routes'));
+app.use('/api/admin/dashboard', require('./routes/admin/dashboard.routes'));
+
+// Buyer API routes
+app.use('/api/buyer/auth', require('./routes/buyer/auth.routes'));
+app.use('/api/buyer/products', require('./routes/buyer/product.routes'));
+app.use('/api/buyer/cart', require('./routes/buyer/cart.routes'));
+app.use('/api/buyer/profile', require('./routes/buyer/profile.routes'));
+app.use('/api/buyer/wishlist', require('./routes/buyer/wishlist.routes'));
+app.use('/api/buyer/reviews', require('./routes/buyer/review.routes'));
+
+// Seller API routes
+app.use('/api/seller/auth', require('./routes/seller/auth.routes'));
+app.use('/api/seller/products', require('./routes/seller/products.routes'));
+
+// Repair Center API routes
+app.use('/api/repair-center/auth', require('./routes/repairCenter/auth.routes'));
+app.use('/api/repair-center/requests', require('./routes/repairCenter/repairRequests.routes'));
 
 // Serve static files in production
 if (NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../../client/build')));
+  // For Vite projects, the build folder is 'dist'
+  app.use(express.static(path.join(__dirname, '../../client/dist')));
   
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../../client/build/index.html'));
+    res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
   });
 }
 
@@ -62,8 +92,9 @@ app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
     error: true,
-    code: 'SERVER_ERROR',
-    message: 'Something went wrong on the server'
+    code: err.code || 'SERVER_ERROR',
+    message: err.message || 'An unexpected error occurred',
+    details: err.details || {}
   });
 });
 

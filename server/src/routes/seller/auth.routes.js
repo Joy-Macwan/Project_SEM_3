@@ -17,8 +17,9 @@ router.post('/login', auditLog('SELLER_LOGIN'), authController.login);
 // Verify email
 router.get('/verify-email/:token', authController.verifyEmail);
 
-// Refresh token
+// Refresh token - support both endpoint names for compatibility
 router.post('/refresh', authController.refreshToken);
+router.post('/refresh-token', authController.refreshToken);
 
 // Logout
 router.post('/logout', authenticateToken, auditLog('SELLER_LOGOUT'), authController.logout);

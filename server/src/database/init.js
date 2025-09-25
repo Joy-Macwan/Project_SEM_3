@@ -1,8 +1,7 @@
 const sequelize = require('./connection');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
-const models = require('./modelsFixed');
-const additionalModels = require('./additionalModelsFixed');
+const { setupAssociations, ...allModels } = require('./allModels');
 
 // Helper function to hash passwords
 const hashPassword = async (password) => {
@@ -10,13 +9,10 @@ const hashPassword = async (password) => {
   return await bcrypt.hash(password, salt);
 };
 
-// Combine all models
-const allModels = { ...models, ...additionalModels };
-
 const seedDatabase = async () => {
   try {
     // Create admin user if not exists
-    const adminExists = await models.User.findOne({
+    const adminExists = await allModels.User.findOne({
       where: { email: 'admin@example.com', role: 'admin' }
     });
     
@@ -24,7 +20,7 @@ const seedDatabase = async () => {
       console.log('Creating admin user...');
       
       // Create admin user
-      const adminUser = await models.User.create({
+      const adminUser = await allModels.User.create({
         name: 'Admin User',
         email: 'admin@example.com',
         password: await hashPassword('admin123'),
@@ -33,7 +29,7 @@ const seedDatabase = async () => {
       });
       
       // Create admin profile
-      await models.Admin.create({
+      await allModels.Admin.create({
         userId: adminUser.id,
         adminLevel: 'super_admin',
         mfaEnabled: false
@@ -53,7 +49,7 @@ const seedDatabase = async () => {
     ];
 
     for (const category of categories) {
-      const [cat, created] = await additionalModels.Category.findOrCreate({
+      const [cat, created] = await allModels.Category.findOrCreate({
         where: { slug: category.slug },
         defaults: category
       });
@@ -64,7 +60,7 @@ const seedDatabase = async () => {
     }
 
     // Create sample seller if not exists
-    const sellerExists = await models.User.findOne({
+    const sellerExists = await allModels.User.findOne({
       where: { email: 'seller@example.com', role: 'seller' }
     });
     
@@ -72,7 +68,7 @@ const seedDatabase = async () => {
       console.log('Creating sample seller...');
       
       // Create seller user
-      const sellerUser = await models.User.create({
+      const sellerUser = await allModels.User.create({
         name: 'Sample Seller',
         email: 'seller@example.com',
         password: await hashPassword('seller123'),
@@ -81,7 +77,7 @@ const seedDatabase = async () => {
       });
       
       // Create seller profile
-      await models.Seller.create({
+      await allModels.Seller.create({
         userId: sellerUser.id,
         businessName: 'Eco Gadgets',
         businessAddress: '123 Tech Street, Eco City, EC 12345',
@@ -95,13 +91,13 @@ const seedDatabase = async () => {
       console.log('Sample seller created successfully');
 
       // Create sample products for this seller
-      const smartphones = await additionalModels.Category.findOne({ where: { slug: 'smartphones' } });
-      const laptops = await additionalModels.Category.findOne({ where: { slug: 'laptops' } });
+      const smartphones = await allModels.Category.findOne({ where: { slug: 'smartphones' } });
+      const laptops = await allModels.Category.findOne({ where: { slug: 'laptops' } });
       
-      const seller = await models.Seller.findOne({ where: { userId: sellerUser.id } });
+      const seller = await allModels.Seller.findOne({ where: { userId: sellerUser.id } });
       
       // Create smartphone product
-      const phone = await models.Product.create({
+      const phone = await allModels.Product.create({
         sellerId: seller.id,
         title: 'Refurbished Smartphone XYZ',
         description: 'A fully refurbished smartphone in excellent condition. Features include 6.1" display, 128GB storage, and 8GB RAM.',
@@ -115,7 +111,7 @@ const seedDatabase = async () => {
       });
       
       // Create laptop product
-      const laptop = await models.Product.create({
+      const laptop = await allModels.Product.create({
         sellerId: seller.id,
         title: 'Refurbished Laptop Pro',
         description: 'Professionally refurbished laptop with 15" display, 512GB SSD, 16GB RAM, and latest OS installed.',
@@ -128,15 +124,15 @@ const seedDatabase = async () => {
         status: 'published'
       });
       
-      // Add product images
-      await models.ProductImage.create({
+            // Add another image
+      await allModels.ProductImage.create({
         productId: phone.id,
         url: 'https://example.com/images/smartphone1.jpg',
         order: 1,
         altText: 'Refurbished Smartphone XYZ front view'
       });
       
-      await models.ProductImage.create({
+      await allModels.ProductImage.create({
         productId: laptop.id,
         url: 'https://example.com/images/laptop1.jpg',
         order: 1,
@@ -145,14 +141,14 @@ const seedDatabase = async () => {
       
       // Associate products with categories
       if (smartphones) {
-        await additionalModels.ProductCategory.create({
+        await allModels.ProductCategory.create({
           productId: phone.id,
           categoryId: smartphones.id
         });
       }
       
       if (laptops) {
-        await additionalModels.ProductCategory.create({
+        await allModels.ProductCategory.create({
           productId: laptop.id,
           categoryId: laptops.id
         });
@@ -162,7 +158,7 @@ const seedDatabase = async () => {
     }
 
     // Create sample repair center if not exists
-    const repairCenterExists = await models.User.findOne({
+    const repairCenterExists = await allModels.User.findOne({
       where: { email: 'repair@example.com', role: 'repairCenter' }
     });
     
@@ -170,7 +166,7 @@ const seedDatabase = async () => {
       console.log('Creating sample repair center...');
       
       // Create repair center user
-      const repairUser = await models.User.create({
+      const repairUser = await allModels.User.create({
         name: 'Fix It All Center',
         email: 'repair@example.com',
         password: await hashPassword('repair123'),
@@ -179,7 +175,7 @@ const seedDatabase = async () => {
       });
       
       // Create repair center profile
-      await models.RepairCenter.create({
+      await allModels.RepairCenter.create({
         userId: repairUser.id,
         businessName: 'Fix It All Center',
         businessAddress: '456 Repair Avenue, Fix City, FC 54321',
@@ -195,7 +191,7 @@ const seedDatabase = async () => {
     }
 
     // Create sample buyer if not exists
-    const buyerExists = await models.User.findOne({
+    const buyerExists = await allModels.User.findOne({
       where: { email: 'buyer@example.com', role: 'buyer' }
     });
     
@@ -203,7 +199,7 @@ const seedDatabase = async () => {
       console.log('Creating sample buyer...');
       
       // Create buyer user
-      const buyerUser = await models.User.create({
+      const buyerUser = await allModels.User.create({
         name: 'Sample Buyer',
         email: 'buyer@example.com',
         password: await hashPassword('buyer123'),
@@ -212,7 +208,7 @@ const seedDatabase = async () => {
       });
       
       // Create buyer address
-      await additionalModels.Address.create({
+      await allModels.Address.create({
         userId: buyerUser.id,
         addressType: 'shipping',
         name: 'Sample Buyer',
@@ -226,21 +222,21 @@ const seedDatabase = async () => {
       });
       
       // Create cart for buyer
-      const cart = await additionalModels.Cart.create({
+      const cart = await allModels.Cart.create({
         userId: buyerUser.id
       });
       
       // Create wishlist for buyer
-      const wishlist = await additionalModels.Wishlist.create({
+      const wishlist = await allModels.Wishlist.create({
         userId: buyerUser.id
       });
       
       console.log('Sample buyer created successfully');
       
       // Add sample product to buyer's cart if products exist
-      const product = await models.Product.findOne();
+      const product = await allModels.Product.findOne();
       if (product && cart) {
-        await additionalModels.CartItem.create({
+        await allModels.CartItem.create({
           cartId: cart.id,
           productId: product.id,
           quantity: 1
@@ -250,7 +246,7 @@ const seedDatabase = async () => {
       
       // Add sample product to buyer's wishlist if products exist
       if (product && wishlist) {
-        await additionalModels.WishlistItem.create({
+        await allModels.WishlistItem.create({
           wishlistId: wishlist.id,
           productId: product.id
         });
@@ -268,6 +264,10 @@ const seedDatabase = async () => {
 
 const initDatabase = async () => {
   try {
+    // Setup model associations
+    setupAssociations();
+    console.log('Model associations set up');
+
     // Sync all models with the database
     // In production, use { force: false } and handle migrations properly
     // Use force: false to avoid dropping tables, alter: true to update schema

@@ -11,11 +11,11 @@ const reviewRoutes = require('./buyer/review.routes');
 
 // Map routes to their respective paths
 router.use('/auth', authRoutes);
-router.use('/users', profileRoutes);
+router.use('/profile', profileRoutes);
 router.use('/products', productRoutes);
 router.use('/cart', cartRoutes);
 router.use('/wishlist', wishlistRoutes);
-router.use('/', reviewRoutes); // Review routes have their own prefixes
+router.use('/reviews', reviewRoutes);
 
 // Export the router
 module.exports = router;

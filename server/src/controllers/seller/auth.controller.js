@@ -1,6 +1,6 @@
 const { User, Seller, RefreshToken } = require('../../database/allModels');
 const { generateAccessToken, generateRefreshToken } = require('../../services/auth.service');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer'); // We'll need to install this
 

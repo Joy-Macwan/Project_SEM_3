@@ -1,0 +1,425 @@
+| Action / Resource         |   Buyer   |           Seller  |      RepairCenter  |       Admin   |
+| ------------------------- | ------:   | ---------------:  | ----------------:  | ----------:   |
+| Register / Login          |       ✅ |                ✅ |                 ✅ |           ✅ |
+| Create product listing    |       ❌ |                ✅ |                 ❌ |           ✅ |
+| Edit own product          |       ❌ |                ✅ |                 ❌ |           ✅ |
+| Approve seller KYC        |       ❌ |                ❌ |                 ❌ |           ✅ |
+| Request repair            |       ✅ |    ✅ (on behalf) |  ✅ (accept/quote) |           ✅ |
+| Manage orders             | ✅ (own) | ✅ (seller items) | ✅ (repair orders) |     ✅ (all) |
+| Moderate products/reports |       ❌ |                ❌ |                 ❌ |           ✅ |
+| Payouts / refunds         |       ❌ |         ✅ (view) |          ✅ (view) | ✅ (process) |
+
+
+
+
+
+# Buyer Role — Complete Prompt & Specification
+
+*(Copy-paste this to a developer or AI agent. No code — full feature set, API contract, UI, security, DB notes, tests and acceptance criteria for the **Buyer** role plus core auth flows.)*
+
+---
+
+## 1 — Short summary
+
+Role: **Buyer** — browse & search products, request repairs, add-to-cart, checkout & pay, track orders, raise returns/disputes, review products, manage profile & addresses. Secure registration/login flows and role-safe access enforced.
+
+---
+
+## 2 — Primary buyer goals & pain points
+
+* Find affordable, trusted refurbished or used electronics and repair services.
+* Understand product condition, seller reputation and repair history.
+* Fast, predictable checkout and delivery.
+* Clear repair workflows (quotes, pickup/schedule, status).
+* Easy returns, secure payments and buyer protection.
+
+---
+
+## 3 — Buyer feature list (high level)
+
+* Secure registration/login/email verification/password reset.
+* Profile management (addresses, phone, payment methods — tokenized).
+* Browse / Search / Filter / Sort (category, condition, price, seller rating, location).
+* Product detail view (images, condition tag, specs, seller card, reviews, warranty).
+* Add to cart, update quantities, wishlist/save for later.
+* Checkout: address selection, shipping options, coupons, payment integration (Stripe/Razorpay/COD).
+* Order lifecycle & tracking; download invoices.
+* Purchases history & invoices.
+* Request/track repairs (create request, attach images, choose center or request quote).
+* Rate & review products and sellers.
+* Initiate returns/disputes with evidence photos.
+* In-app messages & notifications (order/shipment/repair status).
+* Buyer support contact / raise ticket.
+* Security features: 2FA (optional), account activity log, logout all devices, email/SMS notifications.
+
+---
+
+## 4 — UX pages & components (each in its own file)
+
+**Pages**
+
+* `HomePage.jsx` — hero, categories, featured deals, repair highlights.
+* `SearchResultsPage.jsx` — filters, sorting, pagination.
+* `ProductPage.jsx` — gallery, specs, add-to-cart, buy-now, request-repair CTA.
+* `CartPage.jsx`
+* `CheckoutPage.jsx`
+* `OrderConfirmationPage.jsx`
+* `OrderHistoryPage.jsx`
+* `OrderDetailPage.jsx`
+* `RepairsPage.jsx` — create & view repair requests.
+* `RepairDetailPage.jsx` — quotes, status, invoices.
+* `Auth/LoginPage.jsx`, `Auth/RegisterPage.jsx`, `Auth/ForgotPassword.jsx`, `Auth/ResetPassword.jsx`
+* `ProfilePage.jsx` — addresses, payment methods, settings.
+* `WishlistPage.jsx`
+* `Support/TicketPage.jsx`
+
+**Components**
+
+* `Header.jsx`, `Footer.jsx`, `ProductCard.jsx`, `ProductGallery.jsx`, `FiltersPanel.jsx`, `CartItem.jsx`, `AddressForm.jsx`, `CheckoutSummary.jsx`, `OrderTimeline.jsx`, `RepairRequestForm.jsx`, `RatingStars.jsx`, `ProtectedRoute.jsx` (file-per-component).
+
+---
+
+## 5 — Client-side state & architecture
+
+* Auth context: `AuthContext.jsx` (manages tokens, refresh flow, user).
+* Cart context: `CartContext.jsx` (persist to localStorage for guest users; merge on login).
+* Hooks: `useAuth`, `useCart`, `useFetch`, `useInfiniteScroll`.
+* API wrappers: `authApi.js`, `productsApi.js`, `cartApi.js`, `ordersApi.js`, `repairsApi.js`, `reviewsApi.js`.
+* Form validation: use schema (Zod/Yup) — each form validation file in `validations/`.
+
+---
+
+## 6 — Buyer-specific backend API endpoints (grouped)
+
+All buyer endpoints require authentication (except browse/search/product retrieval). Use standard status codes and consistent error schema.
+
+### Auth / Profile
+
+* `POST /api/auth/register` — `{ name, email, password, role: "buyer" }` → email verification.
+* `POST /api/auth/login` — `{ email, password }` → accessToken + refreshToken.
+* `POST /api/auth/refresh` — `{ refreshToken }` → new accessToken.
+* `POST /api/auth/logout` — revoke refresh token.
+* `GET /api/users/me` — buyer profile.
+* `PUT /api/users/me` — update profile.
+* `POST /api/users/me/addresses` — add address.
+* `GET /api/users/me/addresses`
+* `PUT /api/users/me/addresses/:id`
+* `DELETE /api/users/me/addresses/:id`
+
+### Products & Search (public)
+
+* `GET /api/products` — `q, category, condition, minPrice, maxPrice, sellerId, sort, page, limit, location`
+* `GET /api/products/:id` — full product + images + reviews + seller summary
+* `GET /api/products/:id/related`
+
+### Cart & Wishlist
+
+* `GET /api/cart` — buyer cart
+* `POST /api/cart` `{ productId, quantity }`
+* `PUT /api/cart/items/:itemId` `{ quantity }`
+* `DELETE /api/cart/items/:itemId`
+* `POST /api/wishlist` `{ productId }`
+* `GET /api/wishlist`
+* `DELETE /api/wishlist/:productId`
+
+### Checkout & Orders
+
+* `POST /api/orders/checkout`
+  Request: `{ cartId, shippingAddressId, paymentMethod, couponCode, shippingOption }`
+  Response: `{ orderId, paymentIntent, total }`
+* `GET /api/orders/:id` — order detail & timeline
+* `GET /api/orders` — buyer order history (pagination, filters)
+* `POST /api/orders/:id/confirm-delivery` — mark delivered (optionally used for dispute windows)
+* `POST /api/orders/:id/return` — raise return with reason & evidence
+
+### Payments
+
+* `POST /api/payments/confirm` — confirm payment intent (server side for webhooks)
+* `POST /api/payments/webhook` — provider webhook endpoint (server verifies signature)
+
+### Reviews & Ratings
+
+* `POST /api/products/:id/reviews` `{ rating, title, body, images }`
+* `GET /api/products/:id/reviews?page&limit`
+
+### Repairs (buyer flows)
+
+* `POST /api/repairs` — create repair request `{ deviceType, brand, model, issueDescription, images, preferredCenterId, pickupRequired, addressId }`
+* `GET /api/repairs` — buyer's repair requests
+* `GET /api/repairs/:id` — detail with quotes
+* `POST /api/repairs/:id/accept-quote` — accept and trigger payment authorization
+* `POST /api/repairs/:id/cancel` — cancel request (business rules apply)
+* `POST /api/repairs/:id/feedback` — post feedback after completion
+
+### Notifications & Support
+
+* `GET /api/notifications` — buyer notifications
+* `POST /api/support/tickets` — create support ticket
+* `GET /api/support/tickets/:id` — ticket detail
+
+---
+
+## 7 — Example request/response shapes (buyer-critical)
+
+**POST /api/cart**
+Request:
+
+```json
+{ "productId": 123, "quantity": 1 }
+```
+
+Success:
+
+```json
+{ "error": false, "data": { "cartId": "abc", "items": [ { "id": 1, "productId": 123, "title":"Phone X", "qty":1, "unitPrice": 4999 } ], "total": 4999 } }
+```
+
+**POST /api/orders/checkout**
+Request:
+
+```json
+{
+  "cartId": "abc",
+  "shippingAddressId": "addr_1",
+  "paymentMethod": "stripe",
+  "couponCode": "SAVE10"
+}
+```
+
+Success:
+
+```json
+{ "error": false, "data": { "orderId": "ORD-2025-0001", "paymentIntent": { "id": "...", "clientSecret": "..." }, "total": 4499 } }
+```
+
+**POST /api/repairs**
+Request:
+
+```json
+{
+ "deviceType": "smartphone",
+ "brand": "Samsung",
+ "model": "A12",
+ "issueDescription": "Touch unresponsive",
+ "images": ["url1","url2"],
+ "pickupRequired": true,
+ "addressId": "addr_1",
+ "preferredCenterId": 12
+}
+```
+
+Success:
+
+```json
+{ "error": false, "data": { "repairId": "R-1234", "status": "requested" } }
+```
+
+---
+
+## 8 — Validation & business rules (buyer-focused)
+
+* Registration: email RFC, password min 8 chars with complexity.
+* Address: require `line1, city, state, postalCode, country, phoneNumber`.
+* Cart: check stock and latest price on add-to-cart and on checkout (price snapshot recorded in OrderItems).
+* Checkout: lock inventory during payment intent; auto-release after timeout (e.g., 15 minutes).
+* Reviews: only buyers who purchased the product (order status `delivered`) can review — or allow verified-purchase badges.
+* Returns: allowed within `returnable_days` configured on product; must provide photos/evidence.
+* Repair cancellations: allow prior to `in_progress` without penalty; once `in_progress` may be partial refund subject to admin.
+
+---
+
+## 9 — Buyer security & privacy best practices
+
+* HTTPS required always.
+* Store tokens securely: prefer httpOnly cookies or access token in memory + refresh token in httpOnly cookie (protect against XSS).
+* Rate-limit sensitive endpoints (login, register, forgot-password).
+* Email verification before sensitive actions (e.g., first payout request or refunds).
+* Mask sensitive data on UI (card numbers last 4 digits only).
+* Validate & sanitize user-provided content (titles, reviews, addresses) to prevent XSS.
+* Use CAPTCHAs on registration and abusive flows if suspicious behavior detected.
+* Anti-fraud checks: block suspicious orders (velocity checks, address mismatch) — flag for manual review.
+* Device/session management: list active sessions, allow logout-all, show last login locations.
+
+---
+
+## 10 — Buyer DB conceptual additions / fields
+
+* `users` table fields already present (role=buyer).
+* `addresses` table: `id, user_id, label, line1, line2, city, state, country, postal_code, phone, is_default`.
+* `carts` & `cart_items` as earlier.
+* `wishlist` table.
+* `orders` & `order_items` with `price_snapshot` and `seller_id`.
+* `payments` log: provider responses, idempotency keys.
+* `repairs` as earlier with buyer-specific views.
+* `notifications` with `user_id` reference.
+* `support_tickets` with `status, messages[]`.
+
+---
+
+## 11 — UI/UX flow (detailed buyer journeys)
+
+### Registration → first purchase
+
+1. User registers → receives verification email with time-limited token (1 hour).
+2. Verifies email → completes profile + adds default address.
+3. Browses catalog → uses filters (condition, price) → opens product page.
+4. Adds to cart → sees price/stock check → proceeds to checkout.
+5. Checkout: selects shipping address, selects payment option, applies coupon.
+6. Payment: completes via provider → order confirmed, email & in-app notification sent.
+7. Order timeline: ordered → shipped → delivered. Buyer can confirm delivery → triggers review window.
+
+### Requesting repair
+
+1. From product or repairs page, buyer creates repair request, uploads images, chooses pickup or drop-off.
+2. Repair centers provide quotes → buyer chooses one → payment authorization or immediate payment → repair is scheduled.
+3. Buyer tracks status and receives invoice when complete.
+
+### Returns/disputes
+
+1. Buyer raises return within configured return window, provides evidence.
+2. Seller or admin reviews → refund processed via gateway + audits.
+
+---
+
+## 12 — Testing & QA (buyer-critical)
+
+**Unit & Integration Tests**
+
+* Cart: adding an out-of-stock product triggers 409 and cart not updated.
+* Checkout: price mismatch between cart and product returns conflict; order fails gracefully.
+* Orders: order history returns correct pagination & totals.
+* Repairs: create repair request with invalid images returns validation error.
+
+**E2E Tests**
+
+* Guest browse → register → login → add-to-cart → checkout (mock payment) → order visible in history.
+* Buyer creates repair request → repair center quotes visible → accept quote → order for repair created.
+* Buyer raises return within returnable period → refund initiated.
+
+**Security Tests**
+
+* CSRF test for cookie-based auth endpoints.
+* Attempt XSS in address fields; ensure output sanitized.
+* Token expiration & refresh flows.
+
+---
+
+## 13 — Acceptance criteria
+
+* Buyer can register, verify email, login and manage profile.
+* Buyer can browse & search with filters and see correct paginated product lists.
+* Buyer can add to cart, update quantities, and remove items.
+* Checkout creates order and returns a valid payment intent; order stored with price snapshots.
+* Buyer can view order history and order details.
+* Buyer can create and track repair requests and accept quotes.
+* Buyer can leave a review only if eligible (verified purchase).
+* All buyer API endpoints enforce proper auth & rate limits.
+* Sensitive operations logged (payments, refunds, disputes).
+
+---
+
+## 14 — File & module organization (suggested)
+
+**Client**
+
+```
+/client/src/pages/Buyer/
+  HomePage.jsx
+  SearchResultsPage.jsx
+  ProductPage.jsx
+  CartPage.jsx
+  CheckoutPage.jsx
+  Orders/OrderHistoryPage.jsx
+  Repairs/RepairsPage.jsx
+  Auth/LoginPage.jsx
+  Auth/RegisterPage.jsx
+
+/client/src/components/Buyer/
+  ProductCard.jsx
+  ProductGallery.jsx
+  CartItem.jsx
+  AddressForm.jsx
+  RepairRequestForm.jsx
+
+/client/src/api/
+  authApi.js
+  productsApi.js
+  cartApi.js
+  ordersApi.js
+  repairsApi.js
+```
+
+**Server**
+
+```
+/server/src/routes/
+  products.routes.js
+  cart.routes.js
+  orders.routes.js
+  repairs.routes.js
+  auth.routes.js
+  users.routes.js
+
+/server/src/controllers/
+  products.controller.js
+  cart.controller.js
+  orders.controller.js
+  repairs.controller.js
+  auth.controller.js
+  users.controller.js
+
+/server/src/validations/
+  auth.schema.js
+  product.schema.js
+  cart.schema.js
+  order.schema.js
+  repair.schema.js
+```
+
+---
+
+## 15 — Performance & scaling notes (buyer perspective)
+
+* Cache product listing queries with short TTL and invalidate on product updates.
+* Use pagination/infinite scroll with server-side limits.
+* Offload image serving to CDN; lazy-load images on product listing pages.
+* Use optimistic UI updates for cart but reconcile with server responses (inventory/price checks).
+
+---
+
+## 16 — Privacy & compliance
+
+* Provide ability to export user data (GDPR right-to-access) and delete account (with caution for transaction history retention).
+* Store minimal PII; when storing payment methods, use tokenization via gateway (do not store raw card details).
+* Maintain consent logs for marketing communications.
+
+---
+
+## 17 — Notifications & communication
+
+* Email templates for: registration verification, password reset, order confirmation, shipping, delivery, repair quotes, refund processed.
+* In-app notifications for status updates; push notifications optional (use device tokens).
+* Option for SMS for critical alerts (OTP, high-value order).
+
+---
+
+## 18 — Deliverables (buyer module)
+
+* API docs for buyer endpoints (OpenAPI/Postman).
+* UI component prop sheets & page wireframes.
+* Acceptance test checklist & automated test scripts for major buyer flows.
+* README with setup & seed data for buyer demo (demo buyer account, sample addresses, sample products).
+* Security checklist for buyer flows.
+
+---
+
+## 19 — Next useful outputs I can generate right now
+
+Pick one and I’ll produce it immediately (no code):
+
+1. **BUYER\_API\_SPEC.md** — endpoint-by-endpoint with request/response JSON, auth rules, validation.
+2. **Buyer UI Component Prop Sheets** — for each component: props, events, sample data.
+3. **2-week sprint plan** — PR-sized tickets to deliver Buyer MVP features.
+4. **E2E test scenarios** — Cypress/Playwright-ready test plan for buyer flows.
+
+

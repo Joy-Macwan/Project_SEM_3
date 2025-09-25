@@ -1,0 +1,461 @@
+| Action / Resource         |   Buyer   |           Seller  |      RepairCenter  |       Admin   |
+| ------------------------- | ------:   | ---------------:  | ----------------:  | ----------:   |
+| Register / Login          |       ✅ |                ✅ |                 ✅ |           ✅ |
+| Create product listing    |       ❌ |                ✅ |                 ❌ |           ✅ |
+| Edit own product          |       ❌ |                ✅ |                 ❌ |           ✅ |
+| Approve seller KYC        |       ❌ |                ❌ |                 ❌ |           ✅ |
+| Request repair            |       ✅ |    ✅ (on behalf) |  ✅ (accept/quote) |           ✅ |
+| Manage orders             | ✅ (own) | ✅ (seller items) | ✅ (repair orders) |     ✅ (all) |
+| Moderate products/reports |       ❌ |                ❌ |                 ❌ |           ✅ |
+| Payouts / refunds         |       ❌ |         ✅ (view) |          ✅ (view) | ✅ (process) |
+
+
+# RepairCenter Role — Complete Prompt & Specification
+
+*(Copy-paste this to a developer or AI agent. No code — full feature set, API contract, UI, security, DB notes, tests and acceptance criteria for the **RepairCenter** role in the Repair • Reuse • Reduce marketplace.)*
+
+---
+
+## 1 — One-line summary
+
+Role: **RepairCenter** — register and run an authorized repair business within the platform: receive repair requests, inspect & quote, accept jobs, manage technicians & parts inventory, schedule pickups/appointments, complete repairs with invoice & parts-usage logging, and participate in parts marketplace. All operations are secure, auditable and integrated with buyer/seller flows.
+
+---
+
+## 2 — Primary goals & pain points
+
+* Receive structured repair requests with photos and device metadata.
+* Provide accurate quotes, ETA and parts estimates.
+* Schedule pickups/appointments and manage technician assignments.
+* Track parts inventory and request/reserve parts from platform parts marketplace.
+* Produce clear invoices, warranties on repair work, and post-repair reports.
+* Ensure quick payment settlement for completed jobs.
+* Maintain service-level metrics and customer communication history.
+
+---
+
+## 3 — High-level RepairCenter features
+
+* **Onboarding & Verification:** repair center profile, business info, service areas, KYC, license upload, admin approval.
+* **Repair Request Intake:** list of incoming requests, filter/search, quick-view with photos and device specs.
+* **Quote Management:** create/edit quotes (labor + parts + taxes), set quote validity window, attach estimate docs.
+* **Scheduling & Appointments:** schedule pickup/drop-off, on-site or in-shop appointments, reschedule, technician assignment.
+* **Job Lifecycle:** request → quoted → accepted → in\_progress → awaiting\_parts → repaired → quality\_check → completed → closed.
+* **Parts Inventory:** track parts stock, reserve parts per job, create parts purchase orders (PO) or request parts from platform parts marketplace or other repair centers.
+* **Technician Management:** manage technicians, shifts, skills, workload.
+* **Invoicing & Payments:** generate invoice (PDF), accept payment (integrated gateway / COD), request payouts.
+* **Warranty & Returns for Repairs:** record warranty period for repair work and parts, handle warranty claims.
+* **Repair Reporting:** repair notes, parts used, timesheets, repair report PDF.
+* **Communication:** message thread with buyer and optionally seller/admin; automated notifications for quote, schedule, status changes.
+* **Analytics & SLAs:** average turnaround time, quote acceptance rate, repeat repair rate, revenue by service type.
+* **Dispute Handling:** accept/defend disputes with photo reports, admin escalation path.
+* **Parts Marketplace Integration:** list spare parts for sale, buy parts from marketplace, manage pricing & inventory.
+* **Security & Audit:** audit logs for job status changes, parts used, price changes.
+
+---
+
+## 4 — Basic auth & security flows (platform-wide, repair-center specifics)
+
+* **Registration**: RepairCenter sign-up with business details (name, address, service radius), contact person and phone number, upload business license and KYC docs.
+* **Admin Approval**: repair center profiles must be approved by Admin before receiving public repair requests (can be `pending`, `approved`, `rejected`).
+* **Login**: JWT (access + refresh) or cookie-based session; recommend access token 15 minutes, refresh token 30 days with rotation and revocation.
+* **MFA/TOTP**: mandatory for RepairCenter users performing high-value actions (accepting quotes > threshold, changing bank/payout details).
+* **Device/session management**: show active sessions; allow logout-all.
+* **Password security**: Argon2/Bcrypt hashing; enforce strong passwords.
+* **Rate limits**: stricter for endpoints that create quotes, PO, or change financial state.
+* **File access**: KYC docs, repair reports and invoices served via short-lived signed URLs (presigned).
+* **CSRF**: protect cookie-based auth flows.
+* **Role enforcement**: endpoints guarded by `repairCenterRole` middleware.
+
+---
+
+## 5 — Core Job lifecycle & business rules
+
+* **Quote validity**: quotes have `valid_until` timestamp (e.g., 7 days). Buyer acceptance after expiry requires new quote.
+* **Partial acceptance**: buyer may accept labor only or full quote; if parts unavailable, status becomes `awaiting_parts`.
+* **Parts reservation**: upon quote acceptance, parts are reserved in RepairCenter inventory or platform parts marketplace (decrement on acceptance).
+* **Cancellations**: buyer can cancel before `in_progress` without penalty; cancellations after `in_progress` may incur partial charge (configurable).
+* **Warranty**: repair center specifies warranty period on repair and on parts used; warranty claims create a `warranty_case` linked to original job.
+* **Payment flow**: prefer `authorize` on acceptance then `capture` on job completion; support COD or immediate capture as per configuration.
+* **Dispute**: buyer can open dispute within warranty/return window; repair center can respond with report; admin mediates if unresolved.
+
+---
+
+## 6 — RepairCenter UX pages & components (file-per-component)
+
+**Pages**
+
+* `RepairCenterOnboarding.jsx`
+* `RepairCenterDashboard.jsx` — KPIs: pending requests, accepted jobs, SLA alerts, revenue.
+* `InboundRequests.jsx` — list/filter/search repair requests.
+* `RepairRequestDetail.jsx` — full request view, images, device specs, create quote.
+* `QuotesPage.jsx` — created quotes (draft/published/expired).
+* `JobsPage.jsx` — active jobs with statuses.
+* `JobDetail.jsx` — parts used, notes, technician logs, invoice, close job.
+* `AppointmentsCalendar.jsx` — schedule & calendar view (day/week/month).
+* `TechniciansPage.jsx` — manage technicians, skills, availability.
+* `PartsInventory.jsx` — parts list, stock levels, reorder alerts.
+* `PartsMarketplace.jsx` — browse parts, create purchase request.
+* `InvoicesPage.jsx` — invoices, invoices PDF download.
+* `PayoutsPage.jsx` — payout requests, history.
+* `WarrantyClaims.jsx` — warranty claim list and handling.
+* `ReportsPage.jsx` — metrics & export.
+
+**Components**
+
+* `RequestCard.jsx`, `QuoteForm.jsx`, `InvoiceGenerator.jsx`, `PartsRow.jsx`, `TechnicianAssignModal.jsx`, `CalendarComponent.jsx`, `PhotoEvidenceViewer.jsx`, `MessageThread.jsx`, `ConfirmationModal.jsx`.
+
+---
+
+## 7 — Backend API endpoints (grouped; require repair center auth & audit logging)
+
+### Onboarding & Profile
+
+* `POST /api/repaircenters/apply` — submit application & docs.
+* `GET /api/repaircenters/me` — profile.
+* `PUT /api/repaircenters/me` — update profile (requires re-approval for critical changes).
+* `GET /api/repaircenters/:id` — public summary (if approved).
+
+### Incoming repair requests (public->repair center)
+
+* `GET /api/repaircenters/me/requests` — list with filters (status, date, device\_type, location).
+* `GET /api/repaircenters/me/requests/:id` — request detail.
+* `POST /api/repaircenters/me/requests/:id/comment` — internal note or message to buyer.
+
+### Quotes & Estimates
+
+* `POST /api/repaircenters/me/requests/:id/quotes` — create quote `{ labor, parts:[{partId, qty, unitPrice}], taxes, notes, validUntil }`.
+* `PUT /api/repaircenters/me/quotes/:quoteId` — update quote (if not accepted).
+* `GET /api/repaircenters/me/quotes` — list quotes.
+* `POST /api/repaircenters/me/quotes/:quoteId/publish` — send quote to buyer (notifies buyer).
+* `POST /api/repaircenters/me/quotes/:quoteId/cancel` — cancel quote.
+
+### Jobs & Scheduling
+
+* `POST /api/repaircenters/me/requests/:id/assign` — accept job and create job record; assign technician.
+* `PUT /api/repaircenters/me/jobs/:jobId` — update job status (in\_progress, awaiting\_parts, repaired, quality\_check, completed).
+* `POST /api/repaircenters/me/jobs/:jobId/assign-technician` — assign or reassign.
+* `POST /api/repaircenters/me/jobs/:jobId/schedule` — schedule pickup/appointment `{ dateTime, mode:pickup|dropoff|onsite }`.
+* `POST /api/repaircenters/me/jobs/:jobId/log-time` — technician timesheet: `{ techId, minutes, notes }`.
+
+### Parts & Inventory
+
+* `GET /api/repaircenters/me/parts` — list parts & stock.
+* `POST /api/repaircenters/me/parts` — add part (SKU, name, brand, purchasePrice, salePrice, qty, minStock).
+* `PUT /api/repaircenters/me/parts/:partId` — update part details.
+* `POST /api/repaircenters/me/parts/:partId/reserve` — reserve parts for job `{ jobId, qty }`.
+* `POST /api/repaircenters/me/parts/purchase` — purchase parts from marketplace or vendor.
+
+### Invoicing & Payments
+
+* `POST /api/repaircenters/me/jobs/:jobId/invoice` — generate invoice (line items, taxes, total) and optional immediate payment capture.
+* `GET /api/repaircenters/me/invoices` — list invoices.
+* `GET /api/repaircenters/me/invoices/:invoiceId/pdf` — download invoice PDF (presigned or generated).
+* `POST /api/repaircenters/me/payouts/request` — request payout for captured payments (if platform holds funds).
+* `GET /api/repaircenters/me/payouts` — payout history.
+
+### Warranty & Claims
+
+* `GET /api/repaircenters/me/warranty-claims` — list warranty claims for repairs done by this center.
+* `PUT /api/repaircenters/me/warranty-claims/:id/respond` — accept/deny claim with notes.
+
+### Messaging & Notifications
+
+* `GET /api/repaircenters/me/messages` — threads.
+* `POST /api/repaircenters/me/messages/:threadId` — send message.
+
+### Reporting & Metrics
+
+* `GET /api/repaircenters/me/reports/summary?from&to` — turnaround time, revenue, parts cost, job counts.
+* `GET /api/repaircenters/me/reports/export` — CSV export.
+
+---
+
+## 8 — Example request/response shapes (key flows)
+
+**Create Quote**
+`POST /api/repaircenters/me/requests/REQ-123/quotes`
+Request:
+
+```json
+{
+  "labor": 500,
+  "parts": [
+    { "partId": "P-555", "name": "Display Panel", "qty": 1, "unitPrice": 1200 }
+  ],
+  "taxes": 108.0,
+  "notes": "Includes 30-day warranty on labor. Part warranty 90 days.",
+  "validUntil": "2025-10-01T12:00:00Z"
+}
+```
+
+Response:
+
+```json
+{
+  "error": false,
+  "data": {
+    "quoteId": "Q-789",
+    "requestId": "REQ-123",
+    "totalAmount": 1808.0,
+    "status": "published",
+    "publishedAt": "2025-09-15T10:01:02Z"
+  }
+}
+```
+
+**Accept Job / Create Job**
+`POST /api/repaircenters/me/requests/REQ-123/assign`
+Request:
+
+```json
+{ "quoteId": "Q-789", "assignedTechnicianId": "T-11", "scheduledAt": "2025-09-17T10:00:00Z", "mode": "pickup" }
+```
+
+Response:
+
+```json
+{ "error": false, "data": { "jobId": "JOB-2025-0001", "status": "scheduled" } }
+```
+
+**Generate Invoice**
+`POST /api/repaircenters/me/jobs/JOB-2025-0001/invoice`
+Request:
+
+```json
+{ "paymentMethod": "stripe", "captureOnCreate": true }
+```
+
+Response:
+
+```json
+{ "error": false, "data": { "invoiceId": "INV-555", "amount": 1808.0, "paymentStatus": "captured", "pdfUrl": "https://..." } }
+```
+
+---
+
+## 9 — Data model additions (conceptual only)
+
+* `repair_centers`: `id, user_id, business_name, address, service_radius_km, is_approved, rating_avg, kyc_docs[]`
+* `repair_requests`: `id, buyer_id, device_type, brand, model, issue_description, photos[], location, preferred_center, status, created_at`
+* `quotes`: `id, request_id, repair_center_id, labor, parts[], taxes, total, status, valid_until, published_at`
+* `jobs`: `id, quote_id, repair_center_id, assigned_technician_id, scheduled_at, status, timesheets[], notes[], parts_used[]`
+* `technicians`: `id, repair_center_id, name, skills[], phone, email, availability[]`
+* `parts_inventory`: `id, repair_center_id, sku, name, brand, qty_on_hand, min_stock, purchase_price, sale_price`
+* `invoices`: `id, job_id, repair_center_id, amount, taxes, payment_status, invoice_pdf_url, created_at`
+* `warranty_claims`: `id, job_id, claim_type, evidence_urls[], status, resolution_notes`
+* `messages`: threaded messages linked to `request` or `job`
+* `parts_purchase_orders`: PO records for external purchases
+
+---
+
+## 10 — Validation & business rules (repair-center specific)
+
+* Quote fields required: `labor >= 0`, each `part.qty >= 1`, `unitPrice >= 0`.
+* `validUntil` must be in future and within platform max (e.g., ≤ 30 days).
+* Technician assignment: technician must belong to repair center and be available at scheduled time (calendar conflict check).
+* Parts reserve: cannot reserve more than `qty_on_hand`.
+* Invoice amounts must match job record (parts used + labor + taxes).
+* Refund/adjustment flows: must be logged and reasoned; partial refunds allowed with admin review.
+* Dispute resolution: record time-stamped evidence and admin action logs.
+
+---
+
+## 11 — Integrations & third-party services
+
+* **Payment Gateway**: Stripe/Razorpay for payment capture & refunds, support for `authorize`/`capture`.
+* **SMS/Email**: Twilio/SendGrid for notifications and OTP.
+* **Calendar**: Google Calendar / iCal export for appointments (optional).
+* **Shipping/Logistics**: pickup labels if platform supports pickup via courier partners.
+* **PDF generator**: for invoices & repair reports (e.g., Puppeteer or server-side PDF lib).
+* **Background jobs**: image processing, PDF generation, bulk inventory sync, external PO processing.
+
+---
+
+## 12 — Notifications & webhooks
+
+* Notify buyer when: quote published, quote accepted, job scheduled, job status changes, invoice generated.
+* Notify repair center when: new request in service area, buyer accepts quote, parts available or PO fulfilled.
+* Webhooks for: payment events (charge succeeded/failed), parts marketplace fulfillment, courier tracking events.
+* All notifications recorded in `notifications` table and in-app message thread.
+
+---
+
+## 13 — Security & privacy checklist (RepairCenter)
+
+* KYC docs & invoices served via presigned URLs with short TTL.
+* Enforce MFA for actions affecting money or schedule changes above threshold.
+* Ensure proper role checks: repair center cannot access other centers’ jobs or parts inventory.
+* Rate limit creation of quotes/POs to prevent abuse.
+* Log all status transitions and financial actions in `audit_logs`.
+* Validate and sanitize all file metadata and user-provided text (notes).
+* Keep PII minimal and mask in UI where possible (full address view only when required).
+
+---
+
+## 14 — Testing strategy (repair-center critical)
+
+**Unit / Integration**
+
+* Quote creation & validation logic.
+* Parts reservation logic (concurrency simulation: two jobs reserving same parts).
+* Technician scheduling conflict detection.
+* Invoice generation and payment capture flows (mock gateway).
+* Warranty claim creation & resolution.
+
+**E2E**
+
+* Repair request → quote published → buyer accepts → job assigned → parts reserved → technician marks in\_progress → repair completed → invoice generated & payment captured → job closed.
+* Parts marketplace purchase: repair center orders part → vendor fulfillment → stock increases → reserve works.
+* Warranty claim: buyer opens claim within warranty period → repair center resolves.
+
+**Security Tests**
+
+* Access control: ensure repair center A cannot view jobs of repair center B.
+* Attempt to reserve more parts than available (should fail).
+* Token expiration & refresh flows.
+
+---
+
+## 15 — Acceptance criteria (repair-center module)
+
+* Repair center can apply and be approved by admin; only approved centers get inbound requests.
+* Repair center can create, publish and manage quotes; quote sent to buyer triggers notification.
+* Repair center can accept job, schedule appointment, assign technician, log timesheets.
+* Parts inventory supports reserve & decrement for job; concurrent reservations prevented.
+* Invoice generation and payment capture flow works (mock provider in tests).
+* Job lifecycle transitions logged and visible to buyer and admin.
+* Warranty claim flow present and functional.
+* All repair-center actions that affect money or inventory are audited.
+
+---
+
+## 16 — File & module organization (server & client subset)
+
+### Server
+
+```
+/server/src/routes/repaircenters/
+  onboarding.routes.js
+  requests.routes.js
+  quotes.routes.js
+  jobs.routes.js
+  parts.routes.js
+  invoices.routes.js
+  payouts.routes.js
+  warranty.routes.js
+  reports.routes.js
+
+/server/src/controllers/repaircenters/
+  onboarding.controller.js
+  requests.controller.js
+  quotes.controller.js
+  jobs.controller.js
+  parts.controller.js
+  invoices.controller.js
+  payouts.controller.js
+  warranty.controller.js
+  reports.controller.js
+
+/server/src/services/
+  repairRequest.service.js
+  quote.service.js
+  job.service.js
+  partsInventory.service.js
+  invoice.service.js
+  payout.service.js
+  technician.service.js
+
+/server/src/middleware/
+  auth.middleware.js
+  repairCenterRole.middleware.js
+  audit.middleware.js
+  rateLimit.middleware.js
+```
+
+### Client (Repair Center Dashboard)
+
+```
+/client/src/repaircenter/pages/
+  Onboarding.jsx
+  Dashboard.jsx
+  Requests.jsx
+  RequestDetail.jsx
+  Quotes.jsx
+  Jobs.jsx
+  JobDetail.jsx
+  PartsInventory.jsx
+  Technicians.jsx
+  Appointments.jsx
+  Invoices.jsx
+  Payouts.jsx
+  Reports.jsx
+
+/client/src/repaircenter/components/
+  QuoteForm.jsx
+  PartsTable.jsx
+  TechnicianModal.jsx
+  AppointmentCalendar.jsx
+  InvoicePdfViewer.jsx
+  MessageThread.jsx
+
+/client/src/repaircenter/api/
+  repairRequests.api.js
+  quotes.api.js
+  jobs.api.js
+  parts.api.js
+  invoices.api.js
+```
+
+---
+
+## 17 — Monitoring & SLAs
+
+* Monitor: time-to-first-response (time from request creation → first quote), average turnaround time, percent of quotes accepted, parts OOS rate.
+* SLA alerts: if pending jobs > X hours, if parts backlog grows, if technician utilization > 90%.
+* Health checks: background job failures (PDF generation, PO fulfillment), payment capture failures.
+
+---
+
+## 18 — Operational & compliance notes
+
+* Repair centers must comply with local electronics waste regulations for disposal of hazardous components (batteries).
+* Provide digital receipts and warranty certificates for customers.
+* Keep records of parts sourced and disposed for environmental reporting (reduce module integration).
+
+---
+
+## 19 — Deliverables (repair-center module)
+
+* API docs (OpenAPI/Postman) for repair-center endpoints.
+* Repair Center UI wireframes & component prop sheets.
+* Acceptance & test scripts (unit/integration/E2E).
+* Seed/demo data: sample repair requests, parts inventory, technicians.
+* README with setup steps and mock payment provider instructions.
+* Security checklist & audit runbook for dispute handling.
+
+---
+
+## 20 — Priority checklist (what to build first for RepairCenter MVP)
+
+1. Onboarding & Admin approval flow (repair center apply → admin approve).
+2. Incoming requests list & detail page with photos and device metadata.
+3. Quote creation, publish to buyer, and notification flow.
+4. Accept job → create job record and assign technician.
+5. Basic parts inventory: add part, update qty, reserve part for job.
+6. Job status transitions (in\_progress → repaired → completed) and basic timesheet logging.
+7. Invoice generation (PDF) and mock payment capture.
+8. Messaging thread with buyer and job timeline.
+9. Warranty claim create/respond flow.
+10. Tests for concurrency on parts reservation and quote acceptance.
+
+---
+
+## 21 — Next outputs I can produce immediately (pick one)
+
+1. **REPAIRCENTER\_API\_SPEC.md** — endpoint-by-endpoint with JSON requests/responses, validation rules, auth requirements.
+2. **RepairCenter UI Component Prop Sheets** — props, events, sample data for each major component.
+3. **2-week sprint plan** — PR-sized tickets for RepairCenter MVP with acceptance criteria and rough story points.
+4. **E2E test scenarios** — Playwright/Cypress-ready end-to-end test plan for RepairCenter flows.
+
+Which one should I generate **now**?

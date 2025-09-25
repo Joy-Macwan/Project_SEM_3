@@ -22,7 +22,7 @@ const getProducts = async (req, res) => {
     
     // Build where conditions
     const whereConditions = {
-      status: 'active' // Only show active products
+      status: ['published', 'approved'] // Only show published and approved products
     };
     
     // Search by query
@@ -72,45 +72,17 @@ const getProducts = async (req, res) => {
       where: whereConditions,
       order,
       limit: parseInt(limit),
-      offset,
-      include: [
-        {
-          model: ProductImage,
-          as: 'images',
-          limit: 1 // Just get the first image for the thumbnail
-        },
-        {
-          model: Category,
-          as: 'category'
-        },
-        {
-          model: User,
-          as: 'seller',
-          attributes: ['id', 'name', 'role']
-        },
-        {
-          model: Review,
-          as: 'reviews',
-          attributes: []
-        }
-      ],
-      attributes: {
-        include: [
-          [sequelize.fn('AVG', sequelize.col('reviews.rating')), 'avgRating'],
-          [sequelize.fn('COUNT', sequelize.col('reviews.id')), 'reviewCount']
-        ]
-      },
-      group: ['Product.id']
+      offset
     });
     
     // Calculate pagination
-    const totalPages = Math.ceil(count.length / parseInt(limit));
+    const totalPages = Math.ceil(count / parseInt(limit));
     
     return res.status(200).json({
       error: false,
       products,
       pagination: {
-        total: count.length,
+        total: count,
         page: parseInt(page),
         limit: parseInt(limit),
         totalPages

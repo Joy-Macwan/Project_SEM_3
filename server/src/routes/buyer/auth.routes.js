@@ -28,6 +28,12 @@ router.get('/verify-email/:token', verificationLimiter, authController.verifyEma
 router.post('/forgot-password', authLimiter, authController.forgotPassword);
 
 // Reset password route
-router.post('/reset-password/:token', verificationLimiter, authController.resetPassword);
+router.post('/reset-password', verificationLimiter, authController.resetPassword);
+
+// Refresh token route
+router.post('/refresh-token', authLimiter, authController.refreshToken);
+
+// Logout route
+router.post('/logout', authController.logout);
 
 module.exports = router;

@@ -1,6 +1,6 @@
 const { faker } = require('@faker-js/faker');
 const bcrypt = require('bcryptjs');
-const models = require('./allModels');
+const allModels = require('./allModels');
 
 // Helper function to hash passwords
 const hashPassword = async (password) => {
@@ -13,7 +13,7 @@ const generateUsers = async (count, role = 'buyer') => {
   const users = [];
   
   for (let i = 0; i < count; i++) {
-    const user = await models.User.create({
+    const user = await allModels.User.create({
       name: faker.person.fullName(),
       email: faker.internet.email(),
       password: await hashPassword('password123'),
@@ -23,7 +23,7 @@ const generateUsers = async (count, role = 'buyer') => {
     });
     
     // Create address for user
-    await models.Address.create({
+    await allModels.Address.create({
       userId: user.id,
       addressType: 'shipping',
       name: user.name,
@@ -39,11 +39,11 @@ const generateUsers = async (count, role = 'buyer') => {
     
     // Create cart and wishlist for buyers
     if (role === 'buyer') {
-      await models.Cart.create({
+      await allModels.Cart.create({
         userId: user.id
       });
       
-      await models.Wishlist.create({
+      await allModels.Wishlist.create({
         userId: user.id
       });
     }
@@ -60,7 +60,7 @@ const generateSellers = async (count) => {
   const users = await generateUsers(count, 'seller');
   
   for (const user of users) {
-    const seller = await models.Seller.create({
+    const seller = await allModels.Seller.create({
       userId: user.id,
       businessName: faker.company.name(),
       businessAddress: faker.location.streetAddress(),
@@ -82,7 +82,7 @@ const generateRepairCenters = async (count) => {
   const users = await generateUsers(count, 'repairCenter');
   
   for (const user of users) {
-    const repairCenter = await models.RepairCenter.create({
+    const repairCenter = await allModels.RepairCenter.create({
       userId: user.id,
       businessName: `${faker.company.name()} Repairs`,
       businessAddress: faker.location.streetAddress(),
@@ -102,13 +102,13 @@ const generateRepairCenters = async (count) => {
 // Generate products for sellers
 const generateProducts = async (sellerId, count) => {
   const products = [];
-  const categories = await models.Category.findAll();
+  const categories = await allModels.Category.findAll();
   
   for (let i = 0; i < count; i++) {
     const condition = faker.helpers.arrayElement(['new', 'like_new', 'good', 'fair', 'parts_only']);
     const price = faker.number.float({ min: 10, max: 1000, precision: 0.01 });
     
-    const product = await models.Product.create({
+    const product = await allModels.Product.create({
       sellerId: sellerId,
       title: faker.commerce.productName(),
       description: faker.commerce.productDescription(),
@@ -125,7 +125,7 @@ const generateProducts = async (sellerId, count) => {
     // Add 1-3 product images
     const imageCount = faker.number.int({ min: 1, max: 3 });
     for (let j = 0; j < imageCount; j++) {
-      await models.ProductImage.create({
+      await allModels.ProductImage.create({
         productId: product.id,
         url: faker.image.url(),
         order: j + 1,
@@ -139,7 +139,7 @@ const generateProducts = async (sellerId, count) => {
       const selectedCategories = faker.helpers.arrayElements(categories, categoryCount);
       
       for (const category of selectedCategories) {
-        await models.ProductCategory.create({
+        await allModels.ProductCategory.create({
           productId: product.id,
           categoryId: category.id
         });
@@ -162,7 +162,7 @@ const generateRepairRequests = async (buyerIds, repairCenterIds, count) => {
     const repairCenterId = repairCenterIds[faker.number.int({ min: 0, max: repairCenterIds.length - 1 })];
     const status = statuses[faker.number.int({ min: 0, max: statuses.length - 1 })];
     
-    const request = await models.RepairRequest.create({
+    const request = await allModels.RepairRequest.create({
       userId: buyerId,
       deviceType: faker.helpers.arrayElement(['smartphone', 'laptop', 'tablet', 'desktop', 'appliance']),
       brand: faker.company.name(),
@@ -182,7 +182,7 @@ const generateRepairRequests = async (buyerIds, repairCenterIds, count) => {
       const taxAmount = (laborCost + partsCost) * 0.08;
       const totalCost = laborCost + partsCost + taxAmount;
       
-      await models.RepairQuote.create({
+      await allModels.RepairQuote.create({
         repairRequestId: request.id,
         repairCenterId: repairCenterId,
         laborCost: laborCost,
@@ -201,7 +201,7 @@ const generateRepairRequests = async (buyerIds, repairCenterIds, count) => {
         const partsCount = faker.number.int({ min: 1, max: 3 });
         
         for (let j = 0; j < partsCount; j++) {
-          await models.RepairPart.create({
+          await allModels.RepairPart.create({
             repairRequestId: request.id,
             name: `${faker.commerce.productName()} Part`,
             description: faker.lorem.sentence(),
@@ -215,7 +215,7 @@ const generateRepairRequests = async (buyerIds, repairCenterIds, count) => {
         const logCount = faker.number.int({ min: 1, max: 5 });
         
         for (let j = 0; j < logCount; j++) {
-          await models.RepairLog.create({
+          await allModels.RepairLog.create({
             repairRequestId: request.id,
             userId: repairCenterId,
             status: faker.helpers.arrayElement(['started', 'diagnosed', 'parts_ordered', 'parts_received', 'repairing', 'completed']),
@@ -227,7 +227,7 @@ const generateRepairRequests = async (buyerIds, repairCenterIds, count) => {
       
       // If completed, add payment and possibly a review
       if (status === 'completed') {
-        await models.Payment.create({
+        await allModels.Payment.create({
           userId: buyerId,
           repairQuoteId: request.id,
           amount: totalCost,
@@ -239,7 +239,7 @@ const generateRepairRequests = async (buyerIds, repairCenterIds, count) => {
         
         // 70% chance to add a review
         if (faker.number.int({ min: 1, max: 10 }) <= 7) {
-          await models.Review.create({
+          await allModels.Review.create({
             userId: buyerId,
             repairRequestId: request.id,
             repairCenterId: repairCenterId,
@@ -299,7 +299,7 @@ const generateOrders = async (buyerIds, products, count) => {
     }
     
     // Create the order
-    const order = await models.Order.create({
+    const order = await allModels.Order.create({
       buyerId: buyerId,
       orderNumber: `ORD-${faker.string.alphanumeric(8)}`,
       totalAmount: totalAmount,
@@ -315,7 +315,7 @@ const generateOrders = async (buyerIds, products, count) => {
     
     // Create order items
     for (const item of orderItems) {
-      await models.OrderItem.create({
+      await allModels.OrderItem.create({
         orderId: order.id,
         ...item
       });
@@ -323,7 +323,7 @@ const generateOrders = async (buyerIds, products, count) => {
     
     // Create payment if applicable
     if (paymentStatus !== 'pending') {
-      await models.Payment.create({
+      await allModels.Payment.create({
         userId: buyerId,
         orderId: order.id,
         amount: totalAmount,
@@ -341,7 +341,7 @@ const generateOrders = async (buyerIds, products, count) => {
     if (status === 'delivered') {
       for (const item of orderItems) {
         if (faker.number.int({ min: 1, max: 10 }) <= 5) {
-          await models.Review.create({
+          await allModels.Review.create({
             userId: buyerId,
             productId: item.productId,
             sellerId: item.sellerId,
@@ -397,6 +397,7 @@ const generateMockData = async () => {
     console.log('Mock data generation complete!');
   } catch (error) {
     console.error('Error generating mock data:', error);
+    throw error;
   }
 };
 

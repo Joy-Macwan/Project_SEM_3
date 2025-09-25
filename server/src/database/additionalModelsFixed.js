@@ -1,6 +1,5 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('./connection');
-const { User, Product, Order, RepairRequest } = require('./modelsFixed');
 
 // Address Model
 const Address = sequelize.define('Address', {
@@ -327,62 +326,7 @@ const ProductCategory = sequelize.define('ProductCategory', {
   },
 });
 
-// Define relationships with explicit foreign keys
-User.hasMany(Address, { foreignKey: 'userId' });
-Address.belongsTo(User, { foreignKey: 'userId' });
-
-User.hasOne(Cart, { foreignKey: 'userId' });
-Cart.belongsTo(User, { foreignKey: 'userId' });
-
-Cart.hasMany(CartItem, { foreignKey: 'cartId' });
-CartItem.belongsTo(Cart, { foreignKey: 'cartId' });
-
-Product.hasMany(CartItem, { foreignKey: 'productId' });
-CartItem.belongsTo(Product, { foreignKey: 'productId' });
-
-User.hasOne(Wishlist, { foreignKey: 'userId' });
-Wishlist.belongsTo(User, { foreignKey: 'userId' });
-
-Wishlist.hasMany(WishlistItem, { foreignKey: 'wishlistId' });
-WishlistItem.belongsTo(Wishlist, { foreignKey: 'wishlistId' });
-
-Product.hasMany(WishlistItem, { foreignKey: 'productId' });
-WishlistItem.belongsTo(Product, { foreignKey: 'productId' });
-
-User.hasMany(Payment, { foreignKey: 'userId' });
-Payment.belongsTo(User, { foreignKey: 'userId' });
-
-Order.hasMany(Payment, { foreignKey: 'orderId' });
-Payment.belongsTo(Order, { foreignKey: 'orderId' });
-
-RepairRequest.hasMany(Payment, { foreignKey: 'repairQuoteId' });
-Payment.belongsTo(RepairRequest, { foreignKey: 'repairQuoteId', as: 'repairPayment' });
-
-RepairRequest.hasMany(RepairLog, { foreignKey: 'repairRequestId' });
-RepairLog.belongsTo(RepairRequest, { foreignKey: 'repairRequestId' });
-
-User.hasMany(RepairLog, { foreignKey: 'userId' });
-RepairLog.belongsTo(User, { foreignKey: 'userId' });
-
-RepairRequest.hasMany(RepairPart, { foreignKey: 'repairRequestId' });
-RepairPart.belongsTo(RepairRequest, { foreignKey: 'repairRequestId' });
-
-User.hasMany(Review, { foreignKey: 'userId' });
-Review.belongsTo(User, { foreignKey: 'userId' });
-
-Product.hasMany(Review, { foreignKey: 'productId', as: 'productReviews' });
-Review.belongsTo(Product, { foreignKey: 'productId' });
-
-RepairRequest.hasOne(Review, { foreignKey: 'repairRequestId', as: 'repairReview' });
-Review.belongsTo(RepairRequest, { foreignKey: 'repairRequestId' });
-
-Category.hasMany(Category, { as: 'subCategories', foreignKey: 'parentId' });
-Category.belongsTo(Category, { as: 'parentCategory', foreignKey: 'parentId' });
-
-Product.belongsToMany(Category, { through: ProductCategory, foreignKey: 'productId' });
-Category.belongsToMany(Product, { through: ProductCategory, foreignKey: 'categoryId' });
-
-// Export models
+// Export all models - associations will be set up in allModels.js
 module.exports = {
   Address,
   Cart,

@@ -34,8 +34,9 @@ router.post('/login', authLimiter, auditLog('AUTH_LOGIN_ATTEMPT'), authControlle
 // MFA verification route
 router.post('/verify-mfa', mfaLimiter, auditLog('AUTH_MFA_ATTEMPT'), authController.verifyMfa);
 
-// Refresh token route
+// Refresh token route - update to match client API call
 router.post('/refresh', refreshLimiter, authController.refresh);
+router.post('/refresh-token', refreshLimiter, authController.refresh); // Alias for consistency
 
 // Logout route
 router.post('/logout', authenticateToken, auditLog('AUTH_LOGOUT'), authController.logout);

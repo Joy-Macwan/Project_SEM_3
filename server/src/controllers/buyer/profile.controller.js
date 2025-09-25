@@ -1,6 +1,6 @@
 const { User, Address } = require('../../database/models');
 const { authenticateToken } = require('../../middleware/auth.middleware');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 // Get buyer profile
 const getProfile = async (req, res) => {

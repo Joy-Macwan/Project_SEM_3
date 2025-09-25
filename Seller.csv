@@ -1,0 +1,453 @@
+| Action / Resource         |   Buyer   |           Seller  |      RepairCenter  |       Admin   |
+| ------------------------- | ------:   | ---------------:  | ----------------:  | ----------:   |
+| Register / Login          |       ✅ |                ✅ |                 ✅ |           ✅ |
+| Create product listing    |       ❌ |                ✅ |                 ❌ |           ✅ |
+| Edit own product          |       ❌ |                ✅ |                 ❌ |           ✅ |
+| Approve seller KYC        |       ❌ |                ❌ |                 ❌ |           ✅ |
+| Request repair            |       ✅ |    ✅ (on behalf) |  ✅ (accept/quote) |           ✅ |
+| Manage orders             | ✅ (own) | ✅ (seller items) | ✅ (repair orders) |     ✅ (all) |
+| Moderate products/reports |       ❌ |                ❌ |                 ❌ |           ✅ |
+| Payouts / refunds         |       ❌ |         ✅ (view) |          ✅ (view) | ✅ (process) |
+
+
+
+# Seller Role — Complete Prompt & Specification
+
+*(Copy-paste this to a developer or AI agent. No code — full feature set, API contract, UI, security, DB notes, tests and acceptance criteria for the **Seller** role in the Repair • Reuse • Reduce marketplace.)*
+
+---
+
+## 1 — One-line summary
+
+Role: **Seller** — onboard as an approved seller, create and manage product listings (new/refurbished/used/parts/donation), manage inventory, process orders & shipments, view payouts & reports, respond to returns & disputes, and optionally offer repair services — all through a secure seller dashboard.
+
+---
+
+## 2 — Seller goals & pain points
+
+* Quickly list items with images and clear condition metadata.
+* Manage inventory across listings and SKUs (avoid oversell).
+* Receive orders, fulfill shipments, and track statuses.
+* Get paid on schedule and see clear payout reports and fees.
+* Handle returns, disputes, and buyer queries with minimal friction.
+* Bulk upload listings and manage catalog effectively.
+* Provide repair or trade-in options (seller-side repairs or buybacks).
+
+---
+
+## 3 — High-level seller features
+
+* **Seller Onboarding & KYC**: apply, upload docs, status tracking.
+* **Product Management**: create/edit/publish/unpublish listings; multi-image upload with reorder and thumbnailing; attributes/specs; SKU, price, quantity, condition, shipping options, warranty, return policy.
+* **Inventory Management**: per-listing stock, restock alerts, bulk CSV import/export.
+* **Order Management**: view orders, accept/fulfill/ship, print packing slip & shipping label, update tracking numbers, partial shipments.
+* **Returns & Refunds**: manage return requests, inspect & accept/deny, issue refunds (integrated with payment provider or manual), restock flagged items.
+* **Payouts & Finance**: commission breakdown, pending/paid payouts, payout history, payout reconciliation (CSV), fees.
+* **Messaging & Support**: buyer-seller messaging thread for order-related queries; standard canned responses.
+* **Repair Services (optional)**: seller can mark certain listings as repair-offer, manage repair appointments if they run repair center capabilities.
+* **Analytics & Reports**: sales, returns, conversion, top SKUs, inventory age, regional sales, tax reports.
+* **Promotions**: coupon creation (admin may limit), featured products (admin approval).
+* **Notifications**: email/in-app for new order, return request, payout processed.
+* **Bulk tools**: CSV upload for listings, bulk price update, bulk image upload via presigned URLs.
+* **Security & Compliance**: role-based access, audit logs for seller actions, secure file upload.
+
+---
+
+## 4 — Seller UX pages & components (each file)
+
+**Pages**
+
+* `SellerOnboardingPage.jsx` — apply, upload KYC docs, dashboard status.
+* `SellerDashboard.jsx` — key metrics, recent orders, low-stock alerts.
+* `ProductsListPage.jsx` — seller’s listings (filter: active/draft/sold/out\_of\_stock).
+* `ProductCreatePage.jsx` — add new listing (separate form file).
+* `ProductEditPage.jsx`
+* `InventoryPage.jsx` — SKU-level stock, restock alerts.
+* `OrdersPage.jsx` — list of orders with filters (new, processing, shipped, returned).
+* `OrderDetailPage.jsx` — buyer address, items, packing slip, action buttons (accept/cancel/ship/refund).
+* `ShipmentsPage.jsx` — printed labels, logistics integration.
+* `ReturnsPage.jsx` — return requests, evidence photos, resolution actions.
+* `PayoutsPage.jsx` — pending payouts, payout requests, payout history.
+* `ReportsPage.jsx` — export CSV, charts (sales, returns).
+* `MessagesPage.jsx` — buyer-seller messages.
+* `SettingsPage.jsx` — shipping options, business info, bank/payout details, tax settings.
+
+**Components**
+
+* `SellerHeader.jsx`, `SellerSidebar.jsx`, `ProductForm.jsx`, `ImageUploader.jsx`, `SKUManager.jsx`, `InventoryTable.jsx`, `OrderTimeline.jsx`, `PackingSlip.jsx`, `PayoutsTable.jsx`, `CsvUploader.jsx`, `MessageThread.jsx`, `ConfirmationModal.jsx`.
+
+---
+
+## 5 — Seller backend API endpoints (grouped; all require seller auth & role checks)
+
+Use consistent error format and audit logging for money/fulfillment actions.
+
+### Onboarding & KYC
+
+* `POST /api/seller/apply` — create seller application with `business_name`, `address`, `gst_pan` etc. Attach KYC docs via `uploads`.
+* `GET /api/seller/applications/:id` — view status.
+* `GET /api/seller/me` — seller profile summary.
+* `PUT /api/seller/me` — update business info.
+* `POST /api/seller/bank-details` — add/update payout account (store tokens only, not full bank credentials).
+
+### Products & Inventory
+
+* `GET /api/seller/products` — list seller products (query filters).
+* `GET /api/seller/products/:id`
+* `POST /api/seller/products` — create product (multipart or presigned image URLs).
+* `PUT /api/seller/products/:id` — update product.
+* `DELETE /api/seller/products/:id` — soft-delete or unpublish.
+* `POST /api/seller/products/bulk-upload` — CSV upload (returns processing job id).
+* `POST /api/seller/products/:id/stock` — update stock snapshot (for small updates).
+* `POST /api/seller/products/stock/bulk` — bulk stock updates.
+
+### Images & Media
+
+* `POST /api/uploads/presign` — receive presigned URL(s) for direct-to-storage upload.
+* `POST /api/seller/products/:id/images` — attach image metadata after upload (url, order\_index, alt\_text).
+
+### Orders & Fulfillment
+
+* `GET /api/seller/orders` — filter by status, date range.
+* `GET /api/seller/orders/:id` — order detail.
+* `POST /api/seller/orders/:id/accept` — accept order (if manual acceptance flow used).
+* `POST /api/seller/orders/:id/cancel` — cancel with reason (triggers refund flow).
+* `POST /api/seller/orders/:id/ship` — supply `carrier`, `tracking_number`, `shipment_items`, `shipment_date`.
+* `GET /api/seller/orders/:id/packing-slip` — generate printable packing slip (PDF).
+* `POST /api/seller/orders/:id/partial-ship` — handle partial shipments.
+
+### Returns & Disputes
+
+* `GET /api/seller/returns` — pending return requests.
+* `GET /api/seller/returns/:id` — detail & buyer evidence.
+* `POST /api/seller/returns/:id/approve` — accept return & provide instructions.
+* `POST /api/seller/returns/:id/reject` — reject with reason.
+* `POST /api/seller/returns/:id/receive` — mark received & inspect, option to restock.
+
+### Payouts & Finance
+
+* `GET /api/seller/payouts` — pending & historic payouts.
+* `POST /api/seller/payouts/request` — request payout (if not automatic).
+* `GET /api/seller/finance/summary` — gross sales, commissions, fees, refunds.
+* `GET /api/seller/finance/export` — CSV export.
+
+### Messages & Support
+
+* `GET /api/seller/messages` — message threads.
+* `POST /api/seller/messages/:threadId` — send message to buyer or admin.
+
+### Reports & Exports
+
+* `GET /api/seller/reports/sales?from&to&groupBy` — aggregated metrics.
+* `GET /api/seller/reports/inventory-age` — products unsold > N days.
+* `GET /api/seller/reports/export` — export selected data.
+
+---
+
+## 6 — Sample request/response shapes (seller-critical)
+
+**POST /api/seller/products** (create)
+Request (JSON or multipart):
+
+```json
+{
+ "title":"Used MacBook Pro 2015 - 8GB RAM",
+ "slug":"macbook-pro-2015-8gb",
+ "description":"Used but in good condition, battery 80%",
+ "category":"laptops",
+ "condition":"used",
+ "price": 24000,
+ "currency":"INR",
+ "quantity": 2,
+ "shipping_weight_grams": 1500,
+ "warranty_days": 30,
+ "returnable_days": 7,
+ "images": ["https://cdn.example/uploads/uuid1.jpg", "https://cdn.example/uploads/uuid2.jpg"],
+ "specs": { "cpu":"i5", "ram":"8GB", "storage":"256GB SSD" }
+}
+```
+
+Response:
+
+```json
+{ "error": false, "data": { "productId": 987, "status":"draft", "message":"Saved as draft. Publish after review or if auto-approved." } }
+```
+
+**POST /api/seller/orders/\:id/ship**
+Request:
+
+```json
+{
+ "carrier": "DHL",
+ "trackingNumber": "DHL12345",
+ "shipmentItems": [ { "orderItemId": 1, "quantity": 1 } ],
+ "shipmentDate": "2025-09-16T10:00:00Z"
+}
+```
+
+Response:
+
+```json
+{ "error": false, "data": { "status":"shipped", "trackingUrl":"https://dhl.com/track/DHL12345" } }
+```
+
+---
+
+## 7 — Seller-specific business & validation rules
+
+* Only `approved` sellers (KYC `approved`) can publish `new` items or request payouts.
+* Price floor/ceil configurable by admin for categories (prevent abusive pricing).
+* Quantity must be integer ≥ 0. Negative adjustments forbidden.
+* When shipping, seller must provide tracking number in allowed format; system may validate via simple regex and attempt provider API to verify.
+* Cancellation penalties: define business policy — e.g., cancel < X hours before ship may incur commission & fees.
+* Returns: seller can request restocking fee if allowed by product settings; must be disclosed.
+* Inventory locks: when order placed, decrease available quantity (or mark reserved); stock release on checkout/cancel/timeout.
+* Bulk import: validate CSV columns; partial failures reported with row numbers.
+
+---
+
+## 8 — Image upload & media handling (seller-focused)
+
+* Support direct-to-storage uploads via presigned PUT URLs (fast).
+* Server validates image metadata upon notify: mime type, dimensions, size, max images count (8).
+* Auto-generate thumbnails (100x100, 400x400) and a display optimized variant.
+* Strip EXIF and geolocation.
+* Support image reorder & set `is_primary`.
+* For bulk uploads, provide asynchronous processing job with progress endpoint: `GET /api/seller/products/bulk-upload/:jobId/status`.
+
+---
+
+## 9 — Security & fraud prevention (seller-specific)
+
+* Sellers should complete identity verification (KYC) before receiving payouts.
+* Enforce strong passwords and optional MFA for sellers (recommended for high-volume sellers).
+* Rate-limit endpoints like product creation and price changes to prevent abuse.
+* Monitor suspicious activity: sudden price drops, mass listings, repeated cancellations — flag for admin review.
+* File validation: scan KYC docs/images to ensure they are not malicious; store with short-lived signed URLs for access.
+* Protect payout endpoints: require 2FA or admin approval for bank detail changes.
+* Audit log: every change to price, quantity, product publish/unpublish and payout request logged (who, when, before/after).
+
+---
+
+## 10 — Shipping & logistics integration suggestions
+
+* Integrate with shipping APIs (DHL, Shiprocket, India-based providers) via `shipments` service (plugin architecture).
+* Auto-generate shipping label (PDF) and tracking URL.
+* Offer shipment cost estimation at checkout (but actual billed by seller or platform as per config).
+* Allow sellers to mark self-fulfilled vs. platform-fulfilled (if platform provides fulfillment).
+* Support COD (cash on delivery) with extra fees, and reconciliation steps when COD funds are collected.
+
+---
+
+## 11 — Payouts & commissions (detailed)
+
+* Platform calculates commission % per sale (configurable).
+* Payout schedule: daily/weekly/bi-weekly — configurable in settings.
+* Payout flow:
+
+  1. Order paid → platform holds funds in escrow/payout account (depends on provider).
+  2. After refund window/fulfillment, funds become eligible for payout.
+  3. Payout batch created and executed via payment provider (Stripe Connect / bank payout APIs).
+  4. Payout record stored: `gross_amount`, `commission_amount`, `taxes`, `net_amount`, `status`, `provider_ref`.
+* Provide seller-side dispute resolution and reconciliation reports for each payout.
+* Allow manual payout trigger (seller or admin) subject to fraud checks.
+* Provide CSV export of payout ledger.
+
+---
+
+## 12 — Reports & analytics (seller dashboard)
+
+* Sales by period (day/week/month), top SKUs, conversion rate (views → orders), average order value, returns %, inventory aging.
+* Alerts: low stock (threshold configurable), negative reviews spike, buyer disputes.
+* Exportable CSVs and charts (downloadable).
+* Allow filter by marketplace region or shipping hub.
+
+---
+
+## 13 — Notifications & communication
+
+* Events that notify seller: new order, cancellation, return request, payout processed, low stock.
+* Channels: email + in-app notifications; optional SMS.
+* Message thread per order for buyer-seller communication; optionally escalate to admin.
+
+---
+
+## 14 — Testing & QA (seller-critical)
+
+**Unit & Integration tests**
+
+* Product CRUD: create, update, publish/unpublish, image attach, validation failures.
+* Inventory: concurrent decrements (simulate multi-user purchase) — ensure no oversell (DB transaction tests).
+* Order lifecycle: accept → ship → partial ship → complete flows; tracking updates.
+* Returns: approve/reject flows with restock & refund triggers.
+
+**E2E tests**
+
+* Seller onboarding → KYC approved by admin stub → product create & publish → product visible publicly → buyer places order → seller processes and ships → order delivered → payout eligible.
+* Bulk CSV upload → products appear with accurate fields; partial failures reported.
+* Payout request → process payout via mocked provider → status updated.
+
+**Security tests**
+
+* Role enforcement: seller endpoints inaccessible to buyer tokens (403).
+* Attempt to modify another seller’s listing → denied.
+* Verify audit logs include key actions (price change, publish, payout).
+
+---
+
+## 15 — Acceptance criteria (seller module)
+
+* Seller can apply and view KYC status; only `approved` sellers can publish and request payouts.
+* Seller can create product with up to 8 images, see thumbnails, and set stock & SKUs.
+* Inventory locking: when buyer checks out, product quantity reserved and cannot be double-sold (simulate concurrent checkout).
+* Seller can view incoming orders, update order status to shipped with tracking, and generate packing slip.
+* Seller can accept/deny returns, mark received items, and trigger restock/refund actions.
+* Seller can view payout schedule, request manual payout, and view payout history with clear commission breakdown.
+* All seller actions that affect money or inventory are audited.
+* File uploads validated and stored securely (presigned URLs + thumbnails).
+* Seller pages & APIs enforce role-based access and rate limiting.
+
+---
+
+## 16 — DB conceptual additions for seller
+
+* `seller_profiles` (as earlier) with `kyc_status`, `bank_details_encrypted`, `payoutPreferences`.
+* `skus` table for SKU-level inventory with `sku_id`, `product_id`, `barcode`, `attributes`, `quantity`.
+* `shipments` table: `id, order_id, carrier, tracking_number, tracking_url, status, shipped_at`.
+* `returns` table: `id, order_item_id, reason, evidence_urls, status, inspected_by, resolution`.
+* `payouts` and `payout_items` (per-order mapping).
+* `uploads` metadata for images and files.
+* `seller_notifications` for targeted notifications.
+
+---
+
+## 17 — File & module organization (server & client seller subset)
+
+### Server
+
+```
+/server/src/routes/seller/
+  onboarding.routes.js
+  products.routes.js
+  inventory.routes.js
+  orders.routes.js
+  returns.routes.js
+  payouts.routes.js
+  uploads.routes.js
+  reports.routes.js
+
+/server/src/controllers/seller/
+  onboarding.controller.js
+  products.controller.js
+  inventory.controller.js
+  orders.controller.js
+  returns.controller.js
+  payouts.controller.js
+  uploads.controller.js
+  reports.controller.js
+
+/server/src/services/
+  seller.service.js
+  inventory.service.js
+  payout.service.js
+  shipment.service.js
+  csvImport.service.js
+  upload.service.js
+
+/server/src/middleware/
+  auth.middleware.js
+  sellerRole.middleware.js
+  rateLimit.middleware.js
+  audit.middleware.js
+```
+
+### Client (Seller Dashboard)
+
+```
+/client/src/seller/pages/
+  Onboarding.jsx
+  Dashboard.jsx
+  ProductsList.jsx
+  ProductCreate.jsx
+  Inventory.jsx
+  Orders.jsx
+  OrderDetail.jsx
+  Returns.jsx
+  Payouts.jsx
+  Reports.jsx
+  Messages.jsx
+
+/client/src/seller/components/
+  ProductForm.jsx
+  ImageUploader.jsx
+  SKUManager.jsx
+  PackingSlip.jsx
+  CsvUploader.jsx
+  PayoutRequestModal.jsx
+  NotificationBell.jsx
+
+/client/src/seller/api/
+  sellerApi.js
+  productsApi.js
+  ordersApi.js
+  payoutsApi.js
+  uploadsApi.js
+
+/client/src/seller/hooks/
+  useSellerAuth.js
+  useInventoryAlerts.js
+```
+
+---
+
+## 18 — Operational & compliance notes
+
+* Sellers must provide tax identifiers (GST/PAN) where applicable; platform should provide tax invoice generation support.
+* Keep payout bank details encrypted and require re-verification for changes (2FA + admin approval optionally).
+* Support audit export for accounting and compliance.
+* For high-value sellers consider manual review of KYC and initial transactions.
+
+---
+
+## 19 — Monitoring & alerts (seller dashboard)
+
+* Alerts for: repeated cancellations, chargeback rate > X%, very high returns, sudden inventory depletion.
+* Track latency in order processing (time between order placed → seller ships).
+* Expose health checks for shipping integrations and presigned URL failures.
+
+---
+
+## 20 — Deliverables (seller module)
+
+* API documentation (OpenAPI/Postman) for seller endpoints.
+* Seller UI wireframes and component prop sheets.
+* Acceptance test scripts (unit/integration/E2E).
+* Seed data for seller demo (approved seller account, sample products, sample orders).
+* README: seller dashboard setup & seeding, KYC testing flow, CSV template for bulk upload.
+* Security checklist for seller operations (payout changes, file uploads, rate limiting).
+
+---
+
+## 21 — Priority checklist (what to build first for Seller MVP)
+
+1. Seller onboarding & KYC submission flow (store docs, admin can approve).
+2. Seller dashboard skeleton & `SellerProfile` (basic info).
+3. Product create/edit with image uploader (local dev storage/presign).
+4. Inventory updates & low-stock alerts.
+5. Orders list & order detail with `ship` action (tracking number).
+6. Payout summary and basic payout request (mock provider).
+7. Returns handling UI & endpoints.
+8. Bulk CSV upload support (asynchronous).
+9. Audit logs for price/stock changes and payouts.
+10. Tests & CI for seller APIs.
+
+---
+
+## 22 — Next outputs I can generate immediately (pick one)
+
+1. **SELLER\_API\_SPEC.md** — complete endpoint-by-endpoint spec with JSON request/response examples, auth rules, validations.
+2. **Seller UI Component Prop Sheets** — props, events, sample data for each seller component.
+3. **2-week sprint plan** — PR-sized tickets for Seller MVP with acceptance criteria and rough story points.
+4. **Bulk CSV template + import validation rules** — header definitions, sample rows, error reporting format.
+
+Which one should I generate **now**?

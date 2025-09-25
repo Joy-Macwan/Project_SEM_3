@@ -1,6 +1,6 @@
 const { User } = require('../../database/models');
 const { generateAccessToken, generateRefreshToken } = require('../../services/auth.service');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer'); // We'll need to install this
 
@@ -382,10 +382,82 @@ const sendPasswordResetEmail = async (email, token) => {
   }
 };
 
+// Refresh access token using refresh token
+const refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (!refreshToken) {
+      return res.status(400).json({
+        error: true,
+        code: 'MISSING_REFRESH_TOKEN',
+        message: 'Refresh token is required'
+      });
+    }
+    
+    // Validate refresh token
+    const { validateRefreshToken } = require('../../middleware/auth.middleware');
+    const validation = await validateRefreshToken(refreshToken);
+    
+    if (!validation.valid) {
+      return res.status(401).json({
+        error: true,
+        code: 'INVALID_REFRESH_TOKEN',
+        message: 'Invalid refresh token'
+      });
+    }
+    
+    // Generate new access token
+    const accessToken = generateAccessToken(validation.user);
+    
+    // Return the new access token
+    return res.json({
+      error: false,
+      accessToken,
+      message: 'Access token refreshed successfully'
+    });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    return res.status(500).json({
+      error: true,
+      code: 'SERVER_ERROR',
+      message: 'An error occurred while refreshing token'
+    });
+  }
+};
+
+// Logout user (invalidate refresh token)
+const logout = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    
+    if (refreshToken) {
+      // Find and remove the refresh token
+      await RefreshToken.destroy({
+        where: { token: refreshToken }
+      });
+    }
+    
+    return res.json({
+      error: false,
+      message: 'Logged out successfully'
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    return res.status(500).json({
+      error: true,
+      code: 'SERVER_ERROR',
+      message: 'An error occurred during logout'
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
   verifyEmail,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  refreshToken,
+  logout
 };
